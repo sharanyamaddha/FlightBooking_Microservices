@@ -5,7 +5,7 @@ The system allows users to search flights, reserve seats, book tickets, view boo
 
 ## Microservices in This Project
 
-1️. Flight Service
+### 1️. Flight Service
 
 Manages:
 
@@ -17,7 +17,7 @@ Seat reservation
 
 Seat release (on cancellation or failure)
 
-2️. Booking Service
+### 2️. Booking Service
 
 Handles:
 
@@ -31,7 +31,7 @@ Cancellation (with seat release)
 
 Booking history & PNR lookup
 
-3️. API Gateway (Spring Cloud Gateway)
+### 3️. API Gateway (Spring Cloud Gateway)
 
 Provides:
 
@@ -41,7 +41,7 @@ Load balancing
 
 Single entry point to all services
 
-4️. Service Registry (Eureka Server)
+### 4️. Service Registry (Eureka Server)
 
 Responsible for:
 
