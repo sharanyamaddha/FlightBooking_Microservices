@@ -4,11 +4,15 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
 import com.flightservice.dto.request.FlightRequest;
+import com.flightservice.dto.request.ReleaseSeatsRequest;
+import com.flightservice.dto.request.ReserveSeatsRequest;
 import com.flightservice.dto.response.FlightResponse;
+import com.flightservice.dto.response.ReserveSeatsResponse;
 import com.flightservice.exceptions.BusinessException;
 import com.flightservice.model.Airline;
 import com.flightservice.model.Flight;
@@ -124,4 +128,68 @@ public class FlightServiceImpl implements FlightService {
         res.setPrice(flight.getPrice());
         return res;
     }
+    
+    @Override
+    public ReserveSeatsResponse reserveSeats(String flightId, ReserveSeatsRequest request) {
+        // load flight
+        Flight flight = flightRepository.findById(flightId)
+                .orElseThrow(() -> new BusinessException("Flight not found with id: " + flightId));
+
+        int count = request.getCount();
+        if (count <= 0) {
+            throw new BusinessException("Invalid seats count: " + count);
+        }
+
+        if (flight.getAvailableSeats() < count) {
+            throw new BusinessException("Not enough seats available. Requested: " + count + ", Available: " + flight.getAvailableSeats());
+        }
+
+        // decrement and save
+        flight.setAvailableSeats(flight.getAvailableSeats() - count);
+        Flight saved = flightRepository.save(flight);
+
+        // build response
+        ReserveSeatsResponse resp = new ReserveSeatsResponse();
+        resp.setSuccess(true);
+        resp.setReservationReference("RES-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        resp.setSeatsReserved(count);
+        resp.setRemainingSeats(saved.getAvailableSeats());
+        return resp;
+    }
+
+    @Override
+    public void releaseSeats(String flightId, ReleaseSeatsRequest request) {
+        Flight flight = flightRepository.findById(flightId)
+                .orElseThrow(() -> new BusinessException("Flight not found with id: " + flightId));
+
+        int count = request.getCount();
+        if (count <= 0) {
+            throw new BusinessException("Invalid seats count: " + count);
+        }
+
+        flight.setAvailableSeats(flight.getAvailableSeats() + count);
+        flightRepository.save(flight);
+    }
+
+    @Override
+    public FlightResponse getFlightById(String id) {
+        Flight flight = flightRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("Flight not found with id: " + id));
+
+        FlightResponse response = new FlightResponse();
+        //response.setFlightId(flight.getFlightId());
+        response.setAirlineName(flight.getAirlineName());
+        response.setSource(flight.getSource());
+        response.setDestination(flight.getDestination());
+        response.setDepartureDateTime(flight.getDepartureDateTime());
+        response.setDepartureDateTime(flight.getDepartureDateTime());
+        response.setArrivalDateTime(flight.getArrivalDateTime());
+        response.setArrivalDateTime(flight.getArrivalDateTime());
+        response.setAvailableSeats(flight.getAvailableSeats());
+        response.setPrice(flight.getPrice());
+
+        return response;
+    }
+
+    
 }

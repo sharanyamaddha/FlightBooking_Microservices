@@ -7,6 +7,9 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +34,14 @@ import com.bookingservice.repository.BookingRepository;
 import com.bookingservice.repository.PassengerRepository;
 import com.bookingservice.service.BookingService;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+
 @Service
 public class BookingServiceImpl implements BookingService {
+	
+    private static final Logger logger = LoggerFactory.getLogger(BookingServiceImpl.class);
+
 
     @Autowired
     private FlightClient flightClient;                
@@ -43,14 +52,7 @@ public class BookingServiceImpl implements BookingService {
     @Autowired
     private PassengerRepository passengerRepository;
 
-    /**
-     * Create booking:
-     *  - fetch flight via Feign
-     *  - validate seat availability
-     *  - call flight-service reserveSeats (atomic server-side)
-     *  - save booking and passengers
-     *  - if saving fails, call releaseSeats as compensation
-     */
+
     @Override
     @Transactional
     public BookingResponse createBooking(String flightId, BookingRequest request) {
@@ -180,9 +182,7 @@ public class BookingServiceImpl implements BookingService {
         return response;
     }
 
-    /**
-     * Get booking by PNR — builds response by fetching flight details via Feign.
-     */
+
     @Override
     public BookingResponse getBookingByPnr(String pnr) {
         Booking booking = bookingRepository.findByPnr(pnr)
@@ -222,9 +222,7 @@ public class BookingServiceImpl implements BookingService {
         return res;
     }
 
-    /**
-     * Get booking history for a booker
-     */
+
     @Override
     public List<BookingResponse> getBookingHistory(String bookerEmailId) {
         List<Booking> bookings = bookingRepository.findByBookerEmailIdOrderByBookingDateTimeDesc(bookerEmailId);
@@ -269,12 +267,7 @@ public class BookingServiceImpl implements BookingService {
         }).collect(Collectors.toList());
     }
 
-    /**
-     * Cancel booking:
-     *  - validate cancellation window
-     *  - update booking status locally
-     *  - call flight-service to release seats (compensating)
-     */
+
     @Override
     @Transactional
     public String cancelBooking(String pnr) {
@@ -318,5 +311,40 @@ public class BookingServiceImpl implements BookingService {
         }
 
         return "Booking cancelled successfully";
+    }
+    
+    @CircuitBreaker(name = "flightServiceCB", fallbackMethod = "flightFallback")
+    @Retry(name = "flightServiceRetry", fallbackMethod = "flightFallback")
+    public FlightDto safeGetFlight(String flightId) {
+        return flightClient.getFlight(flightId);
+    }
+
+    @CircuitBreaker(name = "flightServiceCB", fallbackMethod = "reserveFallback")
+    @Retry(name = "flightServiceRetry", fallbackMethod = "reserveFallback")
+    public ReserveSeatsResponse safeReserveSeats(String flightId, ReserveSeatsRequest req) {
+        return flightClient.reserveSeats(flightId, req);
+    }
+
+    @CircuitBreaker(name = "flightServiceCB", fallbackMethod = "releaseFallback")
+    @Retry(name = "flightServiceRetry", fallbackMethod = "releaseFallback")
+    public void safeReleaseSeats(String flightId, ReleaseSeatsRequest req) {
+        flightClient.releaseSeats(flightId, req);
+    }
+
+    public FlightDto flightFallback(String flightId, Throwable ex) {
+        logger.error("Flight service unavailable for id {} — fallback invoked: {}", flightId, ex.toString());
+        throw new BusinessException("Flight service unavailable: " + ex.getMessage());
+    }
+
+    public ReserveSeatsResponse reserveFallback(String flightId, ReserveSeatsRequest req, Throwable ex) {
+        logger.error("Reserve fallback for flight {}: {}", flightId, ex.toString());
+        ReserveSeatsResponse r = new ReserveSeatsResponse();
+        r.setSuccess(false);
+        r.setMessage("Fallback: seat reservation failed because FlightService is unavailable");
+        return r;
+    }
+
+    public void releaseFallback(String flightId, ReleaseSeatsRequest req, Throwable ex) {
+        logger.error("Release fallback for flight {}: {}", flightId, ex.toString());
     }
 }
