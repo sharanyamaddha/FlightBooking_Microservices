@@ -75,6 +75,20 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		
+		<dependency>
+  <groupId>org.mockito</groupId>
+  <artifactId>mockito-core</artifactId>
+  <version>5.5.0</version>
+  <scope>test</scope>
+</dependency>
+
+<dependency>
+  <groupId>org.junit.jupiter</groupId>
+  <artifactId>junit-jupiter</artifactId>
+  <version>5.10.0</version>
+  <scope>test</scope>
+</dependency>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
@@ -98,6 +112,38 @@
 
 	<build>
 		<plugins>
+<!-- Fixed JaCoCo config: use UPPERCASE formats -->
+<plugin>
+  <groupId>org.jacoco</groupId>
+  <artifactId>jacoco-maven-plugin</artifactId>
+  <version>0.8.10</version>
+  <executions>
+    <execution>
+      <id>prepare-agent</id>
+      <goals><goal>prepare-agent</goal></goals>
+      <configuration>
+        <destFile>${project.build.directory}/jacoco.exec</destFile>
+      </configuration>
+    </execution>
+
+    <execution>
+      <id>report</id>
+      <phase>verify</phase>
+      <goals><goal>report</goal></goals>
+      <configuration>
+        <dataFile>${project.build.directory}/jacoco.exec</dataFile>
+
+        <!-- NOTE: format names must be UPPERCASE -->
+        <formats>
+          <format>XML</format>
+          <format>HTML</format>
+        </formats>
+
+        <outputDirectory>${project.build.directory}/site/jacoco</outputDirectory>
+      </configuration>
+    </execution>
+  </executions>
+</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>

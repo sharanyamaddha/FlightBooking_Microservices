@@ -9,5 +9,6 @@ public class ReserveSeatsResponse {
 
 	private boolean success;
     private String message;
-    private List<String> reservedSeats; 
+    private List<String> reservedSeats;
+
 }
