@@ -1,9 +1,10 @@
-**Flight Booking Microservices System**
+#Flight Booking Microservices System
 
 A scalable, production-ready microservices architecture built using Spring Boot, Eureka Service Registry, API Gateway, and Feign Clients.
 The system allows users to search flights, reserve seats, book tickets, view booking history, and cancel bookings — all through loosely coupled, independently deployable services.
 
-**Microservices in This Project**
+##Microservices in This Project
+
 1️. Flight Service
 
 Manages:
@@ -52,4 +53,4 @@ Load balancing
 
 Single entry point to all services
 
-Path mapping like:
+
