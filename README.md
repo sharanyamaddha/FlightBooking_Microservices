@@ -4,6 +4,8 @@ A scalable, production-ready microservices architecture built using Spring Boot,
 The system allows users to search flights, reserve seats, book tickets, view booking history, and cancel bookings — all through loosely coupled, independently deployable services.
 
 ## Microservices in This Project
+<img width="928" height="1486" alt="d2 (1)" src="https://github.com/user-attachments/assets/3ac1886b-df83-40ce-a54f-d82ebea2e24a" />
+
 
 ### 1️. Flight Service
 
