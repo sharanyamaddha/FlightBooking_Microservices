@@ -103,16 +103,25 @@
 		</dependency>
 		
 		<!-- Resilience4j via Spring Cloud Circuit Breaker -->
-<dependency>
-  <groupId>org.springframework.cloud</groupId>
-  <artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
-</dependency>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-config</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
 
-	</dependencies>
+
+		</dependencies>
 
 	<build>
 		<plugins>
-<!-- Fixed JaCoCo config: use UPPERCASE formats -->
+			<!-- Fixed JaCoCo config: use UPPERCASE formats -->
 <plugin>
   <groupId>org.jacoco</groupId>
   <artifactId>jacoco-maven-plugin</artifactId>
@@ -133,7 +142,7 @@
       <configuration>
         <dataFile>${project.build.directory}/jacoco.exec</dataFile>
 
-        <!-- NOTE: format names must be UPPERCASE -->
+							<!-- NOTE: format names must be UPPERCASE -->
         <formats>
           <format>XML</format>
           <format>HTML</format>

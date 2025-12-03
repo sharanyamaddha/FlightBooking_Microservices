@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.bookingservice.dto.request.BookingRequest;
 import com.bookingservice.dto.response.BookingResponse;
+import com.bookingservice.rabbitmq.BookingProducer;
 import com.bookingservice.service.BookingService;
 
 import jakarta.validation.Valid;
@@ -24,11 +25,20 @@ public class BookingController {
 
 	@Autowired
     private BookingService bookingService;
+	
+    @Autowired
+    private BookingProducer bookingProducer;  
 
     @PostMapping("/booking/{flightId}")
     public ResponseEntity<String> createBooking(@PathVariable("flightId") String flightId,
                                                 @Valid @RequestBody BookingRequest request) {
         BookingResponse saved = bookingService.createBooking(flightId, request);
+        
+     // ✅ Send event to RabbitMQ after successful booking
+        String eventMessage = "BOOKING_CREATED | PNR: " + saved.getPnr()
+                            + " | Flight: " + flightId
+                            + " | Email: " + saved.getBookerEmailId();
+        bookingProducer.sendBookingCreatedEvent(eventMessage);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved.getPnr());
     }
 
@@ -52,7 +62,12 @@ public class BookingController {
         String message = bookingService.cancelBooking(pnr);
         if (message == null) {
             return ResponseEntity.notFound().build();
+           
         }
+        // ✅ Send cancel event to RabbitMQ
+        String eventMessage = "BOOKING_CANCELLED | PNR: " + pnr;
+        bookingProducer.sendBookingCancelledEvent(eventMessage);
+
         return ResponseEntity.ok(message);
     }
 	
