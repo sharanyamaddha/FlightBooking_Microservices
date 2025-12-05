@@ -18,6 +18,26 @@ public class FlightServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(FlightServiceApplication.class, args);
     }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
 
     // Create a MongoClient from the same URI we want to use
     @Bean

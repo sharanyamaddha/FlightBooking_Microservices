@@ -17,6 +17,7 @@ public class BookingResponse {
 	    private BookingStatus status;
 	    private Double totalAmount;
 	    private LocalDateTime bookingDateTime;
+	    private String FlightId;
 	    TripType tripType;
 
 
@@ -25,4 +26,6 @@ public class BookingResponse {
 	    private String destination;
 
 	    private List<PassengerResponse> passengers;
+
+		
 }

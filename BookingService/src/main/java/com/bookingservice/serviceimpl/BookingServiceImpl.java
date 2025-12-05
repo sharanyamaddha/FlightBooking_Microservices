@@ -8,7 +8,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
-
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,17 +33,13 @@ import com.bookingservice.repository.BookingRepository;
 import com.bookingservice.repository.PassengerRepository;
 import com.bookingservice.service.BookingService;
 
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
-
 @Service
 public class BookingServiceImpl implements BookingService {
-	
+
     private static final Logger logger = LoggerFactory.getLogger(BookingServiceImpl.class);
 
-
     @Autowired
-    private FlightClient flightClient;                
+    private FlightClient flightClient;
 
     @Autowired
     private BookingRepository bookingRepository;
@@ -52,12 +47,11 @@ public class BookingServiceImpl implements BookingService {
     @Autowired
     private PassengerRepository passengerRepository;
 
-
     @Override
     @Transactional
     public BookingResponse createBooking(String flightId, BookingRequest request) {
 
-        // 1) Fetch flight metadata from FlightService via Feign
+        // 1) Fetch flight metadata from FlightService
         FlightDto flightDto;
         try {
             flightDto = flightClient.getFlight(flightId);
@@ -65,13 +59,13 @@ public class BookingServiceImpl implements BookingService {
             throw new BusinessException("Flight not found or flight-service error: " + ex.getMessage());
         }
 
-        // 2) validate counts
+        // 2) Validate passenger count
         int passengerCount = request.getPassengers().size();
         if (flightDto.getAvailableSeats() < passengerCount) {
             throw new BusinessException("Not enough seats available");
         }
 
-        // 3) normalize seat numbers and check local conflicts (passenger collection)
+        // 3) Normalize seat numbers and check conflicts
         List<String> seatNos = request.getPassengers().stream()
                 .map(PassengerRequest::getSeatNo)
                 .filter(Objects::nonNull)
@@ -89,7 +83,7 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
-        // 4) Reserve seats on flight-service (atomic)
+        // 4) Reserve seats on flight-service
         String bookingReference = "BR-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         ReserveSeatsRequest reserveReq = new ReserveSeatsRequest();
         reserveReq.setBookingReference(bookingReference);
@@ -118,13 +112,11 @@ public class BookingServiceImpl implements BookingService {
         booking.setTripType(request.getTripType() != null ? request.getTripType() : TripType.ONE_WAY);
         booking.setBookingDateTime(LocalDateTime.now());
         booking.setSeatsBooked(passengerCount);
-
-        double price = flightDto.getPrice();
-        booking.setTotalAmount(price * passengerCount);
+        booking.setTotalAmount(flightDto.getPrice() * passengerCount);
 
         Booking savedBooking = bookingRepository.save(booking);
 
-        // 6) Save passengers, with compensation if it fails
+        // 6) Save passengers
         List<Passenger> passengersToSave = request.getPassengers().stream().map(pReq -> {
             Passenger p = new Passenger();
             p.setName(pReq.getName());
@@ -140,21 +132,22 @@ public class BookingServiceImpl implements BookingService {
         try {
             passengerRepository.saveAll(passengersToSave);
         } catch (Exception ex) {
-            // Compensation: release seats on FlightService
+            // Compensation: release seats
             ReleaseSeatsRequest releaseReq = new ReleaseSeatsRequest();
             releaseReq.setBookingReference(bookingReference);
             releaseReq.setCount(passengerCount);
             releaseReq.setSeatNumbers(seatNos);
+
             try {
                 flightClient.releaseSeats(flightId, releaseReq);
             } catch (Exception compEx) {
-                // Critical: compensation failed. In production enqueue a retry job for reconciliation.
-                throw new BusinessException("Failed to save passengers and seat-release compensation failed: " + compEx.getMessage());
+                throw new BusinessException("Failed to save passengers & release-seat compensation failed: " + compEx.getMessage());
             }
+
             throw new BusinessException("Failed to save passengers: " + ex.getMessage());
         }
 
-        // 7) Build response (include flight fields fetched earlier)
+        // 7) Build response
         BookingResponse response = new BookingResponse();
         response.setPnr(savedBooking.getPnr());
         response.setStatus(savedBooking.getStatus());
@@ -162,8 +155,6 @@ public class BookingServiceImpl implements BookingService {
         response.setTotalAmount(savedBooking.getTotalAmount());
         response.setBookingDateTime(savedBooking.getBookingDateTime());
         response.setBookerEmailId(savedBooking.getBookerEmailId());
-
-        // flight fields
         response.setSource(flightDto.getSource());
         response.setDestination(flightDto.getDestination());
         response.setAirlineName(flightDto.getAirlineName());
@@ -182,13 +173,11 @@ public class BookingServiceImpl implements BookingService {
         return response;
     }
 
-
     @Override
     public BookingResponse getBookingByPnr(String pnr) {
         Booking booking = bookingRepository.findByPnr(pnr)
                 .orElseThrow(() -> new BusinessException("invalid PNR"));
 
-        // fetch flight fields from flight-service
         FlightDto flightDto;
         try {
             flightDto = flightClient.getFlight(booking.getFlightId());
@@ -222,7 +211,6 @@ public class BookingServiceImpl implements BookingService {
         return res;
     }
 
-
     @Override
     public List<BookingResponse> getBookingHistory(String bookerEmailId) {
         List<Booking> bookings = bookingRepository.findByBookerEmailIdOrderByBookingDateTimeDesc(bookerEmailId);
@@ -231,12 +219,10 @@ public class BookingServiceImpl implements BookingService {
         }
 
         return bookings.stream().map(b -> {
-            // fetch flight info for each booking (could be optimized/cached)
             FlightDto flightDto;
             try {
                 flightDto = flightClient.getFlight(b.getFlightId());
             } catch (Exception ex) {
-                // if flight fetch fails just set nulls or skip — here we throw to keep behavior consistent
                 throw new BusinessException("Failed to fetch flight info for booking: " + b.getPnr());
             }
 
@@ -267,7 +253,6 @@ public class BookingServiceImpl implements BookingService {
         }).collect(Collectors.toList());
     }
 
-
     @Override
     @Transactional
     public String cancelBooking(String pnr) {
@@ -284,19 +269,16 @@ public class BookingServiceImpl implements BookingService {
             throw new BadRequestException("Cancellation allowed only within 24 hours of booking");
         }
 
-        // count passengers for release
         long passengerCount = passengerRepository.countByPnr(pnr);
         int seatsToFree = (int) passengerCount;
 
-        // update local booking status
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
 
-        // call flight-service to release seats (best-effort)
         ReleaseSeatsRequest releaseReq = new ReleaseSeatsRequest();
-        releaseReq.setBookingReference(pnr); // using pnr as reference for release
+        releaseReq.setBookingReference(pnr);
         releaseReq.setCount(seatsToFree);
-        // optional: gather seatNumbers from passengers if you stored them
+
         List<String> seatNumbers = passengerRepository.findByPnr(pnr).stream()
                 .map(Passenger::getSeatNo)
                 .filter(Objects::nonNull)
@@ -306,45 +288,9 @@ public class BookingServiceImpl implements BookingService {
         try {
             flightClient.releaseSeats(booking.getFlightId(), releaseReq);
         } catch (Exception ex) {
-            // If release fails, log and enqueue retry in production. Here we throw to inform caller.
             throw new BusinessException("Booking cancelled locally but releasing seats failed: " + ex.getMessage());
         }
 
         return "Booking cancelled successfully";
-    }
-    
-    @CircuitBreaker(name = "flightServiceCB", fallbackMethod = "flightFallback")
-    @Retry(name = "flightServiceRetry", fallbackMethod = "flightFallback")
-    public FlightDto safeGetFlight(String flightId) {
-        return flightClient.getFlight(flightId);
-    }
-
-    @CircuitBreaker(name = "flightServiceCB", fallbackMethod = "reserveFallback")
-    @Retry(name = "flightServiceRetry", fallbackMethod = "reserveFallback")
-    public ReserveSeatsResponse safeReserveSeats(String flightId, ReserveSeatsRequest req) {
-        return flightClient.reserveSeats(flightId, req);
-    }
-
-    @CircuitBreaker(name = "flightServiceCB", fallbackMethod = "releaseFallback")
-    @Retry(name = "flightServiceRetry", fallbackMethod = "releaseFallback")
-    public void safeReleaseSeats(String flightId, ReleaseSeatsRequest req) {
-        flightClient.releaseSeats(flightId, req);
-    }
-
-    public FlightDto flightFallback(String flightId, Throwable ex) {
-        logger.error("Flight service unavailable for id {} — fallback invoked: {}", flightId, ex.toString());
-        throw new BusinessException("Flight service unavailable: " + ex.getMessage());
-    }
-
-    public ReserveSeatsResponse reserveFallback(String flightId, ReserveSeatsRequest req, Throwable ex) {
-        logger.error("Reserve fallback for flight {}: {}", flightId, ex.toString());
-        ReserveSeatsResponse r = new ReserveSeatsResponse();
-        r.setSuccess(false);
-        r.setMessage("Fallback: seat reservation failed because FlightService is unavailable");
-        return r;
-    }
-
-    public void releaseFallback(String flightId, ReleaseSeatsRequest req, Throwable ex) {
-        logger.error("Release fallback for flight {}: {}", flightId, ex.toString());
     }
 }

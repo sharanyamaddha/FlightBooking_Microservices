@@ -9,7 +9,7 @@ import com.bookingservice.client.dto.ReserveSeatsRequest;
 import com.bookingservice.client.dto.ReserveSeatsResponse;
 
 
-@FeignClient(name = "FLIGHTSERVICE",path = "/flights") // serviceId registered in Eureka
+@FeignClient(name = "FLIGHTSERVICE",path = "/flights") 
 public interface FlightClient {
 
     @GetMapping("/{id}")

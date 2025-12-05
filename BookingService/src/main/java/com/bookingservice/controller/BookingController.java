@@ -34,7 +34,7 @@ public class BookingController {
                                                 @Valid @RequestBody BookingRequest request) {
         BookingResponse saved = bookingService.createBooking(flightId, request);
         
-     // ✅ Send event to RabbitMQ after successful booking
+
         String eventMessage = "BOOKING_CREATED | PNR: " + saved.getPnr()
                             + " | Flight: " + flightId
                             + " | Email: " + saved.getBookerEmailId();
@@ -64,7 +64,7 @@ public class BookingController {
             return ResponseEntity.notFound().build();
            
         }
-        // ✅ Send cancel event to RabbitMQ
+        
         String eventMessage = "BOOKING_CANCELLED | PNR: " + pnr;
         bookingProducer.sendBookingCancelledEvent(eventMessage);
 
