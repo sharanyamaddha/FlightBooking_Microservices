@@ -1,0 +1,235 @@
+{
+	"info": {
+		"_postman_id": "8d381775-3e7f-4034-8530-47969672ac96",
+		"name": "Flight Microservices",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "41536847"
+	},
+	"item": [
+		{
+			"name": "adding flights",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"airlineName\": \"SpiceJet\",\r\n  \"source\": \"HYD\",\r\n  \"destination\": \"DEL\",\r\n  \"departureDateTime\": \"2025-12-10T08:00:00\",\r\n  \"arrivalDateTime\": \"2025-12-10T10:40:00\",\r\n  \"totalSeats\": 150,\r\n  \"price\": 3100\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8090/flights",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8090",
+					"path": [
+						"flights"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "adding flights",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"airlineName\": \"Emirates\",\r\n  \"source\": \"BLR\",\r\n  \"destination\": \"DEL\",\r\n  \"departureDateTime\": \"2025-12-10T08:00:00\",\r\n  \"arrivalDateTime\": \"2025-12-10T10:40:00\",\r\n  \"totalSeats\": 100,\r\n  \"price\": 3500\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8090/flights",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8090",
+					"path": [
+						"flights"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "search flights",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"airlineName\": \"SpiceJet\",\r\n  \"source\": \"HYD\",\r\n  \"destination\": \"DEL\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8090/flights/search",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8090",
+					"path": [
+						"flights",
+						"search"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "create booking",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"bookerEmailId\": \"john.doe@example.com\",\r\n  \"tripType\": \"ONE_WAY\",\r\n  \"passengers\": [\r\n    {\r\n      \"name\": \"John Doe\",\r\n      \"age\": 28,\r\n      \"gender\": \"MALE\",\r\n      \"seatNo\": \"12A\",\r\n      \"mealType\": \"VEG\"\r\n    },\r\n    {\r\n      \"name\": \"Mary Doe\",\r\n      \"age\": 26,\r\n      \"gender\": \"FEMALE\",\r\n      \"seatNo\": \"12B\",\r\n      \"mealType\": \"NON_VEG\"\r\n    }\r\n  ]\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8090/booking/692dd3e00d10a29ea7121ff8",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8090",
+					"path": [
+						"booking",
+						"692dd3e00d10a29ea7121ff8"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "searchby mail id",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8090/booking/history/john.doe@example.com",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8090",
+					"path": [
+						"booking",
+						"history",
+						"john.doe@example.com"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "search by pnr",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8081/booking/PNR-6255BEE2",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"booking",
+						"PNR-6255BEE2"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "cancel booking",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8090/booking/cancel/PNR-6255BEE2",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8090",
+					"path": [
+						"booking",
+						"cancel",
+						"PNR-6255BEE2"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "create booking",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"bookerEmailId\": \"raj@example.com\",\r\n  \"tripType\": \"ROUND_TRIP\",\r\n  \"passengers\": [\r\n    {\r\n      \"name\": \"Raj\",\r\n      \"age\": 28,\r\n      \"gender\": \"MALE\",\r\n      \"seatNo\": \"12C\",\r\n      \"mealType\": \"VEG\"\r\n    }\r\n\r\n  ]\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8090/booking/692dd3e00d10a29ea7121ff8",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8090",
+					"path": [
+						"booking",
+						"692dd3e00d10a29ea7121ff8"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "search by pnr",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8090/booking/PNR-6255BEE2",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8090",
+					"path": [
+						"booking",
+						"PNR-6255BEE2"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
