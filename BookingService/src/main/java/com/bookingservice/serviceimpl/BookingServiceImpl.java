@@ -12,6 +12,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+
 
 import com.bookingservice.client.FlightClient;
 import com.bookingservice.client.dto.FlightDto;
@@ -24,9 +26,12 @@ import com.bookingservice.dto.response.BookingResponse;
 import com.bookingservice.dto.response.PassengerResponse;
 import com.bookingservice.enums.BookingStatus;
 import com.bookingservice.enums.TripType;
+import com.bookingservice.events.BookingCancelledEvent;
+import com.bookingservice.events.BookingCreatedEvent;
 import com.bookingservice.exceptions.BadRequestException;
 import com.bookingservice.exceptions.BusinessException;
 import com.bookingservice.exceptions.ConflictException;
+import com.bookingservice.kafka.BookingEventProducer;
 import com.bookingservice.model.Booking;
 import com.bookingservice.model.Passenger;
 import com.bookingservice.repository.BookingRepository;
@@ -37,6 +42,8 @@ import com.bookingservice.service.BookingService;
 public class BookingServiceImpl implements BookingService {
 
     private static final Logger logger = LoggerFactory.getLogger(BookingServiceImpl.class);
+    private static final String FLIGHT_SERVICE_CB = "flightService"; // circuit breaker name
+
 
     @Autowired
     private FlightClient flightClient;
@@ -46,18 +53,20 @@ public class BookingServiceImpl implements BookingService {
 
     @Autowired
     private PassengerRepository passengerRepository;
+    
+    @Autowired
+    private BookingEventProducer bookingEventProducer;
+
 
     @Override
     @Transactional
+    @CircuitBreaker(name=FLIGHT_SERVICE_CB,fallbackMethod= "createBookingFallback")
     public BookingResponse createBooking(String flightId, BookingRequest request) {
 
         // 1) Fetch flight metadata from FlightService
-        FlightDto flightDto;
-        try {
-            flightDto = flightClient.getFlight(flightId);
-        } catch (Exception ex) {
-            throw new BusinessException("Flight not found or flight-service error: " + ex.getMessage());
-        }
+    	// NEW – don't wrap it, let the exception bubble up
+    	FlightDto flightDto = flightClient.getFlight(flightId);
+
 
         // 2) Validate passenger count
         int passengerCount = request.getPassengers().size();
@@ -82,7 +91,8 @@ public class BookingServiceImpl implements BookingService {
                 throw new BusinessException("Seat(s) already taken: " + taken);
             }
         }
-
+        
+        
         // 4) Reserve seats on flight-service
         String bookingReference = "BR-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         ReserveSeatsRequest reserveReq = new ReserveSeatsRequest();
@@ -90,12 +100,8 @@ public class BookingServiceImpl implements BookingService {
         reserveReq.setCount(passengerCount);
         reserveReq.setSeatNumbers(seatNos);
 
-        ReserveSeatsResponse reserveResp;
-        try {
-            reserveResp = flightClient.reserveSeats(flightId, reserveReq);
-        } catch (Exception ex) {
-            throw new BusinessException("Failed to reserve seats: " + ex.getMessage());
-        }
+        ReserveSeatsResponse reserveResp = flightClient.reserveSeats(flightId, reserveReq);
+
 
         if (reserveResp == null || !reserveResp.isSuccess()) {
             String msg = reserveResp != null ? reserveResp.getMessage() : "Unknown reservation failure";
@@ -169,9 +175,44 @@ public class BookingServiceImpl implements BookingService {
             return pr;
         }).collect(Collectors.toList());
         response.setPassengers(passengerResponses);
+        
+        //publish bookingCreatedEvent to Kafka
+        BookingCreatedEvent event = new BookingCreatedEvent(
+                savedBooking.getPnr(),
+                savedBooking.getBookerEmailId(),
+                savedBooking.getFlightId(),
+                flightDto.getAirlineName(),
+                savedBooking.getSeatsBooked(),
+                savedBooking.getTotalAmount(),
+                savedBooking.getBookingDateTime()
+        );
+        bookingEventProducer.sendBookingCreatedEvent(event);
+        		
 
         return response;
     }
+    
+   
+	public BookingResponse createBookingFallback(String flightId, BookingRequest request, Throwable ex) {
+		logger.error("Fallback triggered for createBooking. Reason: {}", ex.toString());
+
+		if (ex instanceof BusinessException be) {
+			String msg = be.getMessage();
+			if (msg != null && msg.startsWith("Seat(s) already taken")) {
+				throw be; // goes to GlobalExceptionHandler -> 400 with that message
+			}
+			 // Flight not found - pass through
+		    if (msg.startsWith("Flight not found")) {
+		        throw be;
+		    }
+		}
+
+		throw new BusinessException("Flight service is temporarily unavailable. Please try again later.");
+	}
+
+
+
+    
 
     @Override
     public BookingResponse getBookingByPnr(String pnr) {
@@ -255,6 +296,8 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
+    @CircuitBreaker(name = FLIGHT_SERVICE_CB, fallbackMethod = "cancelBookingFallback")
+
     public String cancelBooking(String pnr) {
         Booking booking = bookingRepository.findByPnr(pnr)
                 .orElseThrow(() -> new BusinessException("Invalid PNR"));
@@ -290,7 +333,28 @@ public class BookingServiceImpl implements BookingService {
         } catch (Exception ex) {
             throw new BusinessException("Booking cancelled locally but releasing seats failed: " + ex.getMessage());
         }
+        
+        FlightDto flightDto = flightClient.getFlight(booking.getFlightId());
+
+        BookingCancelledEvent event = new BookingCancelledEvent(
+                booking.getPnr(),
+                booking.getBookerEmailId(),
+                booking.getFlightId(),
+                flightDto.getAirlineName(),
+                LocalDateTime.now()
+        );
+        bookingEventProducer.sendBookingCancelledEvent(event);
 
         return "Booking cancelled successfully";
     }
+    
+    public String cancelBookingFallback(String pnr, Throwable ex) {
+        logger.error("Circuit breaker OPEN for cancelBooking. Reason: {}", ex.getMessage());
+
+        
+        throw new BusinessException("Cannot cancel booking right now. Flight service is unavailable. Please try again later.");
+
+        
+    }
+
 }

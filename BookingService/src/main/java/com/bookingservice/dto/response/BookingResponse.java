@@ -24,6 +24,8 @@ public class BookingResponse {
 	    private String airlineName;
 	    private String source;
 	    private String destination;
+	    
+	    private String userMessage;
 
 	    private List<PassengerResponse> passengers;
 

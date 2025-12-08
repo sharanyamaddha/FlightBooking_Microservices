@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.bookingservice.dto.request.BookingRequest;
 import com.bookingservice.dto.response.BookingResponse;
-import com.bookingservice.rabbitmq.BookingProducer;
+
 import com.bookingservice.service.BookingService;
 
 import jakarta.validation.Valid;
@@ -26,21 +26,16 @@ public class BookingController {
 	@Autowired
     private BookingService bookingService;
 	
-    @Autowired
-    private BookingProducer bookingProducer;  
+  
 
-    @PostMapping("/booking/{flightId}")
-    public ResponseEntity<String> createBooking(@PathVariable("flightId") String flightId,
-                                                @Valid @RequestBody BookingRequest request) {
-        BookingResponse saved = bookingService.createBooking(flightId, request);
-        
+	@PostMapping("/booking/{flightId}")
+	public ResponseEntity<String> createBooking(@PathVariable("flightId") String flightId,
+	                                            @Valid @RequestBody BookingRequest request) {
+	    BookingResponse saved = bookingService.createBooking(flightId, request);
+	    // Kafka event is already published inside the service (BookingEventProducer)
+	    return ResponseEntity.status(HttpStatus.CREATED).body(saved.getPnr());
+	}
 
-        String eventMessage = "BOOKING_CREATED | PNR: " + saved.getPnr()
-                            + " | Flight: " + flightId
-                            + " | Email: " + saved.getBookerEmailId();
-        bookingProducer.sendBookingCreatedEvent(eventMessage);
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved.getPnr());
-    }
 
     @GetMapping("/booking/{pnr}")
     public ResponseEntity<BookingResponse> getBookingByPnr(@PathVariable("pnr") String pnr) {
@@ -62,13 +57,10 @@ public class BookingController {
         String message = bookingService.cancelBooking(pnr);
         if (message == null) {
             return ResponseEntity.notFound().build();
-           
         }
-        
-        String eventMessage = "BOOKING_CANCELLED | PNR: " + pnr;
-        bookingProducer.sendBookingCancelledEvent(eventMessage);
 
+        // If you later want cancel events via Kafka, handle it inside BookingService
         return ResponseEntity.ok(message);
     }
-	
+
 }

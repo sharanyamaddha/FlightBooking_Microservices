@@ -9,7 +9,9 @@ import com.bookingservice.client.dto.ReserveSeatsRequest;
 import com.bookingservice.client.dto.ReserveSeatsResponse;
 
 
-@FeignClient(name = "FLIGHTSERVICE",path = "/flights") 
+@FeignClient( name = "flightClient",
+url = "${flight.service.url}",
+path = "/flights") 
 public interface FlightClient {
 
     @GetMapping("/{id}")
